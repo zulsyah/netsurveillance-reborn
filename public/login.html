@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign in</title>
+<style>
+  :root{--bg:#0e1015;--panel:#161920;--panel2:#1d212b;--line:#262b38;--fg:#e7e9ef;--mut:#8a91a3;--acc:#4c8dff;--bad:#f0616d;color-scheme:dark}
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{display:flex;align-items:center;justify-content:center;padding:16px;color:var(--fg);font:15px/1.45 system-ui,Segoe UI,sans-serif;
+    background:radial-gradient(900px 500px at 15% 10%,#1b2a52 0,transparent 60%),radial-gradient(800px 500px at 90% 90%,#2a1b52 0,transparent 55%),var(--bg)}
+  .card{width:100%;max-width:400px;background:linear-gradient(180deg,#171b24,#13161d);border:1px solid var(--line);border-radius:18px;padding:34px 30px 28px;box-shadow:0 20px 60px #000a}
+  .logo{width:52px;height:52px;border-radius:14px;margin:0 auto 14px;display:grid;place-items:center;background:linear-gradient(135deg,var(--acc),#7b5cff);box-shadow:0 8px 24px #4c8dff55}
+  .logo svg{width:28px;height:28px;fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  h1{margin:0;text-align:center;font-size:21px;font-weight:650}
+  .sub{margin:4px 0 24px;text-align:center;color:var(--mut);font-size:13px}
+  label{display:block;margin:14px 0 6px;color:var(--mut);font-size:13px}
+  .field{position:relative}
+  input{width:100%;padding:11px 14px;background:var(--bg);border:1px solid var(--line);border-radius:10px;color:var(--fg);font:inherit}
+  input:focus{outline:2px solid #4c8dff55;border-color:var(--acc)}
+  .eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--mut);cursor:pointer;padding:6px 8px;border-radius:8px;font-size:12px}
+  .eye:hover{color:var(--fg)}
+  .row{display:flex;align-items:center;gap:8px;margin:14px 0 4px;color:var(--mut);font-size:13px}
+  .row input{width:auto}
+  button.go{width:100%;margin-top:18px;padding:12px;border:0;border-radius:10px;color:#fff;font:inherit;font-weight:600;cursor:pointer;background:linear-gradient(135deg,var(--acc),#6b7bff);transition:filter .15s}
+  button.go:hover{filter:brightness(1.1)}button.go:disabled{opacity:.6;cursor:default}
+  .err{min-height:20px;margin-top:12px;color:var(--bad);font-size:13px;text-align:center}
+  .foot{margin-top:6px;text-align:center;color:var(--mut);font-size:12px}
+</style>
+</head>
+<body>
+<form class="card" id="f" autocomplete="on">
+  <div class="logo"><svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><line x1="6" y1="10.5" x2="14" y2="10.5"/><line x1="6" y1="13.5" x2="10" y2="13.5"/><circle cx="18" cy="12" r="1.2" fill="#fff" stroke="none"/><path d="M6 18v1.5M18 18v1.5"/></svg></div>
+  <h1 id="name">NVR</h1>
+  <div class="sub">Sign in with your NVR account</div>
+  <label for="u">Username</label>
+  <input id="u" name="username" autocomplete="username" autofocus required maxlength="32">
+  <label for="p">Password</label>
+  <div class="field"><input id="p" name="password" type="password" autocomplete="current-password" maxlength="64"><button type="button" class="eye" id="eye">Show</button></div>
+  <div class="row"><input type="checkbox" id="rem" checked><label for="rem" style="margin:0">Remember username</label></div>
+  <button class="go" id="go" type="submit">Sign in</button>
+  <div class="err" id="err" role="alert"></div>
+  <div class="foot"><span id="host"></span> · <a href="/setup.html" style="color:var(--acc)">change</a></div>
+</form>
+<script>
+const $ = s => document.querySelector(s);
+const get = k => { try { return localStorage.getItem(k); } catch { return null; } };
+fetch('/api/branding').then(r => r.json()).then(j => { $('#name').textContent = j.name; document.title = 'Sign in · ' + j.name; $('#host').textContent = 'NVR ' + j.host; }).catch(() => {});
+$('#u').value = get('nvr.user') || '';
+if ($('#u').value) $('#p').focus();
+$('#eye').onclick = () => { const s = $('#p').type === 'password'; $('#p').type = s ? 'text' : 'password'; $('#eye').textContent = s ? 'Hide' : 'Show'; };
+$('#f').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('#err').textContent = ''; $('#go').disabled = true; $('#go').textContent = 'Signing in…';
+  try {
+    const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-NVR': '1' }, body: JSON.stringify({ user: $('#u').value.trim(), password: $('#p').value }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || 'Sign in failed');
+    try { $('#rem').checked ? localStorage.setItem('nvr.user', $('#u').value.trim()) : localStorage.removeItem('nvr.user'); } catch {}
+    location.replace('/');
+  } catch (err) {
+    $('#err').textContent = err.message; $('#go').disabled = false; $('#go').textContent = 'Sign in'; $('#p').select();
+  }
+});
+</script>
+</body>
+</html>

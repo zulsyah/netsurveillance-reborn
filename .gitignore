@@ -1,0 +1,6 @@
+# local settings and secrets: never commit
+config.json
+settings.json
+timesync-login.json
+*.log
+node_modules/

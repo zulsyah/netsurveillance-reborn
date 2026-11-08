@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Connect to your NVR</title>
+<style>
+  :root{--bg:#0e1015;--panel:#161920;--panel2:#1d212b;--line:#262b38;--fg:#e7e9ef;--mut:#8a91a3;--acc:#4c8dff;--ok:#3ecf8e;--bad:#f0616d;--warn:#f5b84a;color-scheme:dark}
+  *{box-sizing:border-box}
+  html,body{min-height:100%;margin:0}
+  body{display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;color:var(--fg);font:15px/1.45 system-ui,Segoe UI,sans-serif;
+    background:radial-gradient(900px 500px at 15% 10%,#1b2a52 0,transparent 60%),radial-gradient(800px 500px at 90% 90%,#2a1b52 0,transparent 55%),var(--bg)}
+  .card{width:100%;max-width:560px;margin:auto;background:linear-gradient(180deg,#171b24,#13161d);border:1px solid var(--line);border-radius:18px;padding:30px;box-shadow:0 20px 60px #000a}
+  .logo{width:52px;height:52px;border-radius:14px;margin:0 auto 14px;display:grid;place-items:center;background:linear-gradient(135deg,var(--acc),#7b5cff);box-shadow:0 8px 24px #4c8dff55}
+  .logo svg{width:28px;height:28px;fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  h1{margin:0;text-align:center;font-size:21px;font-weight:650}
+  .sub{margin:4px 0 20px;text-align:center;color:var(--mut);font-size:13px}
+  h2{margin:22px 0 8px;font-size:14px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+  label{display:block;margin:12px 0 6px;color:var(--mut);font-size:13px}
+  input,select{width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:10px;color:var(--fg);font:inherit}
+  input:focus,select:focus{outline:2px solid #4c8dff55;border-color:var(--acc)}
+  .row{display:flex;gap:8px;align-items:center}.row>*{flex:1}.row>button{flex:none}
+  button{font:inherit;color:var(--fg);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 16px;cursor:pointer}
+  button:hover{border-color:var(--acc)}button:disabled{opacity:.5;cursor:default}
+  button.go{width:100%;margin-top:18px;border:0;color:#fff;font-weight:600;background:linear-gradient(135deg,var(--acc),#6b7bff)}
+  .dev{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-top:8px;background:var(--bg)}
+  .dev .t{flex:1;min-width:0}.dev b{display:block}.dev span{color:var(--mut);font-size:12.5px}
+  .dev button{padding:6px 14px}
+  .msg{margin-top:12px;font-size:13.5px;min-height:20px}.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}.mut{color:var(--mut)}
+  .note{margin:0 0 16px;padding:10px 14px;border-radius:10px;background:#2a2410;border:1px solid #5b4a14;color:var(--warn);font-size:13.5px}
+  details{margin-top:12px}summary{cursor:pointer;color:var(--mut);font-size:13px}
+  a{color:var(--acc)}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo"><svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><line x1="6" y1="10.5" x2="14" y2="10.5"/><line x1="6" y1="13.5" x2="10" y2="13.5"/><circle cx="18" cy="12" r="1.2" fill="#fff" stroke="none"/><path d="M6 18v1.5M18 18v1.5"/></svg></div>
+  <h1 id="title">Connect to your NVR</h1>
+  <div class="sub" id="sub">Tell this app where your NVR is. You sign in with its own accounts afterwards.</div>
+  <div id="status"></div>
+  <div id="main" hidden>
+    <h2>Find it on my network</h2>
+    <div class="row"><select id="net"></select><button id="scan">Search</button></div>
+    <input id="subnet" placeholder="e.g. 192.168.1" hidden style="margin-top:8px" aria-label="Network">
+    <div id="found"></div>
+    <h2>Or type the address</h2>
+    <label for="host" style="margin-top:0">NVR IP address or host name</label>
+    <input id="host" placeholder="192.168.1.100" autocomplete="off" spellcheck="false">
+    <details><summary>Advanced: ports</summary>
+      <div class="row"><div><label for="sp">Control port</label><input id="sp" type="number" value="34567"></div><div><label for="rp">Video (RTSP) port</label><input id="rp" type="number" value="554"></div></div>
+    </details>
+    <div class="msg" id="msg" role="status"></div>
+    <div class="row" style="margin-top:6px"><button id="test">Test connection</button></div>
+    <button class="go" id="save">Save and continue</button>
+  </div>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+const post = (path, body) => fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-NVR': '1' }, body: JSON.stringify(body) }).then(async r => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status); return j; });
+const get = path => fetch(path).then(async r => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status); return j; });
+const el = (t, a = {}, ...k) => { const e = document.createElement(t); for (const x in a) x === 'class' ? e.className = a[x] : x.startsWith('on') ? e.addEventListener(x.slice(2), a[x]) : e.setAttribute(x, a[x]); e.append(...k.flat().filter(c => c != null)); return e; };
+const say = (t, cls) => { $('#msg').textContent = t; $('#msg').className = 'msg ' + (cls || ''); };
+let S = null;
+const addr = () => ({ host: $('#host').value.trim(), sofiaPort: +$('#sp').value || 34567, rtspPort: +$('#rp').value || 554 });
+
+async function init() {
+  try { S = await get('/api/setup'); } catch (e) { $('#status').replaceChildren(el('div', { class: 'note' }, 'Cannot reach the server: ' + e.message)); return; }
+  if (S.name) document.title = 'NVR address · ' + S.name;
+  const st = $('#status');
+  if (!S.configured) { $('#title').textContent = 'Welcome'; st.replaceChildren(); }
+  else {
+    $('#title').textContent = 'NVR connection';
+    st.replaceChildren(el('p', { style: 'text-align:center;margin:0 0 14px' }, 'Now connected to ', el('b', {}, S.host), ' ', el('span', { class: S.reachable ? 'ok' : 'bad' }, S.reachable ? '✓ reachable' : '✗ not reachable')));
+  }
+  if (!S.canChange) {
+    st.append(el('div', { class: 'note' }, 'The address can only be changed by someone signed in. ', el('a', { href: '/login.html' }, 'Sign in'), ', then open Settings › This viewer › NVR connection. If the NVR is switched off or unreachable, this page unlocks by itself.'));
+    return;
+  }
+  if (S.configured && !S.reachable) st.append(el('div', { class: 'note' }, 'The NVR does not answer at this address. Enter its new address below.'));
+  $('#main').hidden = false;
+  $('#host').value = S.host || '';
+  $('#sp').value = S.sofiaPort || 34567; $('#rp').value = S.rtspPort || 554;
+  $('#net').replaceChildren(el('option', { value: '' }, S.subnets.length ? 'All my networks (' + S.subnets.map(x => x + '.x').join(', ') + ')' : 'No network detected'), el('option', { value: '*' }, 'Another network…'));
+  if (!S.configured) scan();
+}
+$('#net').onchange = () => { $('#subnet').hidden = $('#net').value !== '*'; if (!$('#subnet').hidden) $('#subnet').focus(); };
+async function scan() {
+  const sub = $('#net').value === '*' ? $('#subnet').value.trim() : '';
+  if ($('#net').value === '*' && !sub) { $('#subnet').focus(); return; }
+  $('#scan').disabled = true; $('#scan').textContent = 'Searching…';
+  $('#found').replaceChildren(el('p', { class: 'mut' }, 'Looking for NVRs and cameras (about 10 seconds)…'));
+  try {
+    const r = await get('/api/nvr/find' + (sub ? '?subnet=' + encodeURIComponent(sub) : ''));
+    $('#found').replaceChildren(...(r.devices.length ? [el('p', { class: 'mut', style: 'margin:10px 0 0' }, 'Pick your NVR. Cameras may show up here too.'), ...r.devices.map(d => el('div', { class: 'dev' },
+      el('div', { class: 't' }, el('b', {}, d.ip), el('span', {}, [d.name, d.model, 'ports ' + d.ports.join(', ')].filter(Boolean).join(' · '))),
+      el('button', { onclick: () => { $('#host').value = d.ip; if (d.port) $('#sp').value = d.port; say('', ''); test(); } }, 'Use')))] : [el('p', { class: 'mut' }, 'Nothing found on ' + r.subnets.map(x => x + '.x').join(', ') + '. Type the address instead, or search another network.')]));
+  } catch (e) { $('#found').replaceChildren(el('p', { class: 'bad' }, e.message)); }
+  $('#scan').disabled = false; $('#scan').textContent = 'Search';
+}
+$('#scan').onclick = scan;
+async function test() {
+  const a = addr(); if (!a.host) { say('Enter an address first', 'bad'); $('#host').focus(); return false; }
+  say('Testing…', 'mut'); $('#test').disabled = true;
+  try {
+    const r = await post('/api/nvr/test', a);
+    if (r.ok) { say('✓ Found a device at ' + a.host + (r.ident && r.ident.name ? ' (' + r.ident.name + ')' : '') + '. It answers on the NVR control port.', 'ok'); return true; }
+    say(r.error, 'bad'); return false;
+  } catch (e) { say(e.message, 'bad'); return false; } finally { $('#test').disabled = false; }
+}
+$('#test').onclick = test;
+$('#save').onclick = async () => {
+  const a = addr(); if (!a.host) { say('Enter an address first', 'bad'); return; }
+  if (S.configured && S.host !== a.host && S.signedIn && !confirm('Change the NVR to ' + a.host + '? Everyone will be signed out.')) return;
+  $('#save').disabled = true; say('Saving…', 'mut');
+  try { await post('/api/nvr/set', a); say('Saved. Taking you to the sign-in page…', 'ok'); setTimeout(() => location.href = '/login.html', 700); }
+  catch (e) { say(e.message, 'bad'); $('#save').disabled = false; }
+};
+$('#host').addEventListener('keydown', e => { if (e.key === 'Enter') $('#save').click(); });
+init();
+</script>
+</body>
+</html>
