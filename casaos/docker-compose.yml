@@ -1,0 +1,45 @@
+name: netsurveillance-reborn
+services:
+    netsurveillance-reborn:
+        container_name: netsurveillance-reborn
+        image: node:22-alpine
+        command: ["node", "server.js"]
+        working_dir: /app
+        user: "1000:1000"
+        network_mode: host
+        restart: unless-stopped
+        environment:
+            - PORT=8199
+            - BIND=0.0.0.0
+            - RTSP_RELAY_PORT=0
+        labels:
+            icon: https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/frigate.svg
+        volumes:
+            - type: bind
+              source: /home/skyrealm/zul/netsurveillance-reborn
+              target: /app
+        x-casaos:
+            ports:
+                - container: "8199"
+                  description:
+                    en_US: Web UI
+x-casaos:
+    architectures:
+        - arm64
+        - amd64
+    author: skyrealm
+    category: Utilities
+    description:
+        en_US: Web viewer for Xiongmai NetSurveillance NVRs (live view, playback, settings).
+    developer: skyrealm
+    icon: https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/frigate.svg
+    index: /
+    is_uncontrolled: false
+    main: netsurveillance-reborn
+    port_map: "8199"
+    scheme: http
+    store_app_id: netsurveillance-reborn
+    tagline:
+        en_US: NVR live view and playback
+    title:
+        en_US: NVR Viewer

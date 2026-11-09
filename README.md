@@ -35,6 +35,10 @@ Needs Node.js 18 or newer and a browser with WebCodecs (Chrome or Edge). WebCode
 
 `config.json`, `settings.json` and `timesync-login.json` are created at run time and are not in the repository.
 
+## CasaOS
+
+`casaos/docker-compose.yml` runs the viewer as a CasaOS app (`node:22-alpine`, host network, port 8199, LAN bind). Edit the bind-mount `source` to where you cloned this repo, then copy it to `/var/lib/casaos/apps/netsurveillance-reborn/` and run `docker compose up -d` there. Open the page from another PC over HTTPS or allow the origin in the browser (see Security notes).
+
 ## Security notes
 
 - Sign-in uses the NVR's own accounts. Sessions live in memory; the server stores no passwords, except the optional time-sync login (plain text in `timesync-login.json`, only if you tick that box).
