@@ -1,5 +1,5 @@
 // Modern NVR viewer bridge: RTSP (H264, TCP-interleaved) -> WebSocket -> browser WebCodecs.
-// No dependencies. Listens on 127.0.0.1 only.
+// No dependencies. Listens on 127.0.0.1 by default (BIND / config.json "bind" to change).
 const http = require('http'), net = require('net'), crypto = require('crypto'), fs = require('fs'), path = require('path');
 const { Sofia, Conn, XMDemux, sofiaHash } = require('./sofia');
 const { muxH264 } = require('./mp4');
@@ -8,6 +8,8 @@ let cfg = {}; try { cfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'confi
 const PORT = +process.env.PORT || cfg.port || 8088;
 const RELAY_PORT = process.env.RTSP_RELAY_PORT !== undefined ? +process.env.RTSP_RELAY_PORT : (cfg.relayPort !== undefined ? +cfg.relayPort : 8554);   // 0 = off
 const RELAY_BIND = process.env.RTSP_RELAY_BIND || '127.0.0.1';
+const BIND = process.env.BIND || cfg.bind || '127.0.0.1';   // 0.0.0.0 = whole LAN; needs HTTPS (or an SSH tunnel) for WebCodecs off localhost
+const ALLOW_HOSTS = (process.env.ALLOWED_HOSTS || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);   // extra host names, e.g. pi.lan
 let HOST = cfg.host || '', SOFIA_PORT = cfg.sofiaPort || 34567, RTSP_PORT = cfg.rtspPort || 554;   // the NVR; set from the web page on first run
 const PUB = path.join(__dirname, 'public');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml' };
@@ -221,7 +223,16 @@ class WS {
 }
 
 // ---- HTTP API ----
-const hostOk = h => h === `127.0.0.1:${PORT}` || h === `localhost:${PORT}`;
+const LOOPBACK = /^(127\.|localhost$|::1$)/.test(BIND);
+// Host header must be loopback, or (when bound beyond loopback) a bare IPv4 / allow-listed name on our port. Blocks DNS rebinding.
+const hostOk = h => {
+  if (typeof h !== 'string') return false;
+  if (h === `127.0.0.1:${PORT}` || h === `localhost:${PORT}`) return true;
+  if (LOOPBACK) return false;
+  const m = /^(.+):(\d+)$/.exec(h);
+  if (!m || +m[2] !== PORT) return false;
+  return /^\d{1,3}(\.\d{1,3}){3}$/.test(m[1]) || ALLOW_HOSTS.includes(m[1].toLowerCase());
+};
 const json = (res, obj, code = 200) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
 const readBody = req => new Promise((ok, no) => { let b = ''; req.on('data', d => { b += d; if (b.length > 2e6) req.destroy(); }); req.on('end', () => { try { ok(JSON.parse(b || '{}')); } catch (e) { no(e); } }); });
 const fmtT = d => { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; };
@@ -872,5 +883,5 @@ server.on('upgrade', async (req, sock) => {
   s.addClient(ws);
   ws.onclose = () => s.removeClient(ws);
 });
-server.listen(PORT, '127.0.0.1', () => console.log(`NVR viewer: http://127.0.0.1:${PORT}`));
+server.listen(PORT, BIND, () => console.log(`NVR viewer: http://${BIND === '0.0.0.0' ? '127.0.0.1' : BIND}:${PORT}` + (LOOPBACK ? '' : `  (LAN: bound to ${BIND})`)));
 if (RELAY_PORT) startRelay({ port: RELAY_PORT, bind: RELAY_BIND, upstream: () => ({ host: HOST, port: RTSP_PORT }), log: console.log });

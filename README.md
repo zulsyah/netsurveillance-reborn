@@ -28,6 +28,8 @@ Needs Node.js 18 or newer and a browser with WebCodecs (Chrome or Edge). WebCode
 | Setting | How |
 |---|---|
 | Web port | env `PORT` or `port` in `config.json` (default 8088) |
+| Bind address | env `BIND` or `bind` in `config.json` (default 127.0.0.1; `0.0.0.0` = LAN) |
+| Extra host names | env `ALLOWED_HOSTS`, comma separated (IPv4 addresses are always accepted when `BIND` is not loopback) |
 | RTSP relay port | env `RTSP_RELAY_PORT` or `relayPort` (default 8554, `0` = off) |
 | RTSP relay bind | env `RTSP_RELAY_BIND` (default 127.0.0.1) |
 
